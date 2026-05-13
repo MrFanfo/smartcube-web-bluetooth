@@ -1,6 +1,6 @@
 
 import { Subject } from 'rxjs';
-import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider } from '../types';
+import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider, SmartCubeRawMessage } from '../types';
 import type { AttachmentContext } from '../attachment/types';
 import { normalizeUuid } from '../attachment/normalize-uuid';
 import { SmartCubeProtocol, registerProtocol } from '../protocol';
@@ -88,6 +88,7 @@ class GoCubeConnection implements SmartCubeConnection {
     readonly protocol: SmartCubeProtocolInfo = GOCUBE_PROTOCOL;
     readonly capabilities: SmartCubeCapabilities;
     events$: Subject<SmartCubeEvent>;
+    readonly rawMessages$: Subject<SmartCubeRawMessage> = new Subject();
 
     private device: BluetoothDevice;
     private readChrct: BluetoothRemoteGATTCharacteristic | null = null;
@@ -119,8 +120,16 @@ class GoCubeConnection implements SmartCubeConnection {
     }
 
     private onStateChanged = (event: Event): void => {
-        const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const value = characteristic.value;
         if (!value) return;
+        const rawBytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        this.rawMessages$.next({
+            timestamp: now(),
+            characteristicUuid: characteristic.uuid,
+            raw: rawBytes.slice(),
+            decrypted: null
+        });
         this.parseData(value);
     };
 
@@ -293,6 +302,9 @@ class GoCubeConnection implements SmartCubeConnection {
         }
         this.events$.next({ timestamp: now(), type: "DISCONNECT" });
         this.events$.complete();
+        if (!this.rawMessages$.closed) {
+            this.rawMessages$.complete();
+        }
     };
 
     async init(): Promise<void> {

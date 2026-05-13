@@ -44,6 +44,17 @@ type SmartCubeDisconnectEvent = {
     type: "DISCONNECT";
 };
 
+type SmartCubeRawMessage = {
+    /** Host-clock timestamp (ms) when the BLE notification was received. */
+    timestamp: number;
+    /** UUID of the GATT characteristic this packet arrived on. */
+    characteristicUuid: string;
+    /** Bytes exactly as received from the BLE layer (encrypted if the protocol uses encryption). */
+    raw: Uint8Array;
+    /** Bytes after decryption. null when the protocol transmits plaintext. */
+    decrypted: Uint8Array | null;
+};
+
 type SmartCubeEventMessage =
     | SmartCubeMoveEvent
     | SmartCubeFaceletsEvent
@@ -74,6 +85,8 @@ interface SmartCubeConnection {
     readonly protocol: SmartCubeProtocolInfo;
     readonly capabilities: SmartCubeCapabilities;
     events$: Observable<SmartCubeEvent>;
+    /** Raw BLE packets for troubleshooting — emits every notification received from the cube. */
+    rawMessages$: Observable<SmartCubeRawMessage>;
     sendCommand(command: SmartCubeCommand): Promise<void>;
     disconnect(): Promise<void>;
 }
@@ -93,5 +106,6 @@ export type {
     SmartCubeCommand,
     SmartCubeCapabilities,
     SmartCubeConnection,
+    SmartCubeRawMessage,
     MacAddressProvider
 };

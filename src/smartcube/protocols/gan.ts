@@ -1,5 +1,5 @@
-import { Subject } from 'rxjs';
-import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider } from '../types';
+import { Observable, Subject } from 'rxjs';
+import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider, SmartCubeRawMessage } from '../types';
 import type { AttachmentContext } from '../attachment/types';
 import { normalizeUuid } from '../attachment/normalize-uuid';
 import { getCachedMacForDevice, macFromGanManufacturerData, waitForManufacturerData } from '../attachment/address-hints';
@@ -105,6 +105,7 @@ class GanSmartCubeConnection implements SmartCubeConnection {
     private lastBatteryLevel: number | null = null;
     private forceNextBatteryEmission = false;
     events$: Subject<SmartCubeEvent>;
+    readonly rawMessages$: Observable<SmartCubeRawMessage>;
 
     readonly protocol: SmartCubeProtocolInfo;
     readonly capabilities: SmartCubeCapabilities;
@@ -119,6 +120,7 @@ class GanSmartCubeConnection implements SmartCubeConnection {
         }
         this.capabilities = base;
         this.events$ = new Subject<SmartCubeEvent>();
+        this.rawMessages$ = ganConn.rawMessages$;
         ganConn.events$.subscribe({
             next: (event) => {
                 if (

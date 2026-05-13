@@ -1,6 +1,6 @@
 import { Subject } from 'rxjs';
 import { ModeOfOperation } from 'aes-js';
-import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider } from '../types';
+import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider, SmartCubeRawMessage } from '../types';
 import type { AttachmentContext } from '../attachment/types';
 import { normalizeUuid } from '../attachment/normalize-uuid';
 import { getCachedMacForDevice } from '../attachment/address-hints';
@@ -119,6 +119,7 @@ class QiYiConnection implements SmartCubeConnection {
         reset: false
     };
     events$: Subject<SmartCubeEvent>;
+    readonly rawMessages$: Subject<SmartCubeRawMessage> = new Subject();
 
     private device: BluetoothDevice;
     private cubeChrct: BluetoothRemoteGATTCharacteristic | null = null;
@@ -170,7 +171,8 @@ class QiYiConnection implements SmartCubeConnection {
     }
 
     private onCubeEvent = (event: Event): void => {
-        const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const value = characteristic.value;
         if (!value) return;
 
         const encMsg: number[] = [];
@@ -179,6 +181,12 @@ class QiYiConnection implements SmartCubeConnection {
         }
 
         const msg = this.encrypter.decrypt(encMsg);
+        this.rawMessages$.next({
+            timestamp: now(),
+            characteristicUuid: characteristic.uuid,
+            raw: new Uint8Array(encMsg),
+            decrypted: new Uint8Array(msg)
+        });
 
         if (msg[0] === 0xCC && msg[1] === 0x10) {
             this.handleQuaternionPacket(msg);
@@ -346,6 +354,9 @@ class QiYiConnection implements SmartCubeConnection {
         this.forceNextBatteryEmission = false;
         this.events$.next({ timestamp: now(), type: "DISCONNECT" });
         this.events$.complete();
+        if (!this.rawMessages$.closed) {
+            this.rawMessages$.complete();
+        }
     };
 
     async init(): Promise<void> {

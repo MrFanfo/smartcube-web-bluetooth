@@ -4,6 +4,7 @@ import { GanCubeEncrypter } from './gan-cube-encrypter';
 import { GattWriteQueue } from './gan-write-queue';
 import { writeGattCharacteristicValue } from './gatt-characteristic-write';
 import { Observable, Subject } from 'rxjs';
+import type { SmartCubeRawMessage } from './smartcube/types';
 
 /** Command for requesting information about GAN Smart Cube hardware  */
 type GanCubeReqHardwareCommand = {
@@ -163,6 +164,8 @@ interface GanCubeConnection {
     readonly deviceMAC: string;
     /** RxJS Subject to subscribe for cube event messages */
     events$: Observable<GanCubeEvent>;
+    /** Raw BLE packets for troubleshooting */
+    rawMessages$: Observable<SmartCubeRawMessage>;
     /** Method to send command to the cube */
     sendCubeCommand(command: GanCubeCommand): Promise<void>;
     /** Close this connection */
@@ -205,6 +208,7 @@ class GanCubeClassicConnection implements GanCubeConnection, GanCubeRawConnectio
     driver: GanProtocolDriver;
 
     events$: Subject<GanCubeEvent>;
+    readonly rawMessages$: Subject<SmartCubeRawMessage> = new Subject();
 
     private readonly validateDecrypted?: (plaintext: Uint8Array) => boolean;
     private readonly writeQueue = new GattWriteQueue();
@@ -271,6 +275,12 @@ class GanCubeClassicConnection implements GanCubeConnection, GanCubeRawConnectio
             if (!eventMessage || eventMessage.byteLength < 16) return;
             var raw = new Uint8Array(eventMessage.buffer, eventMessage.byteOffset, eventMessage.byteLength);
             var decryptedMessage = this.encrypter.decrypt(raw);
+            this.rawMessages$.next({
+                timestamp: now(),
+                characteristicUuid: characteristic.uuid,
+                raw: raw.slice(),
+                decrypted: decryptedMessage
+            });
             if (this.validateDecrypted && !this.validateDecrypted(decryptedMessage)) return;
             var cubeEvents = await this.driver.handleStateEvent(this, decryptedMessage);
             cubeEvents.forEach(e => this.events$.next(e));
@@ -288,6 +298,9 @@ class GanCubeClassicConnection implements GanCubeConnection, GanCubeRawConnectio
         if (!this.events$.closed) {
             this.events$.next({ timestamp: now(), type: "DISCONNECT" });
             this.events$.complete();
+        }
+        if (!this.rawMessages$.closed) {
+            this.rawMessages$.complete();
         }
     }
 

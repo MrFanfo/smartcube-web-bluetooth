@@ -1,6 +1,6 @@
 
 import { Subject } from 'rxjs';
-import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider } from '../types';
+import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider, SmartCubeRawMessage } from '../types';
 import type { AttachmentContext } from '../attachment/types';
 import { normalizeUuid } from '../attachment/normalize-uuid';
 import { SmartCubeProtocol, registerProtocol } from '../protocol';
@@ -40,6 +40,7 @@ class MoyuMhcConnection implements SmartCubeConnection {
     readonly protocol: SmartCubeProtocolInfo = MOYU_MHC_PROTOCOL;
     readonly capabilities: SmartCubeCapabilities;
     events$: Subject<SmartCubeEvent>;
+    readonly rawMessages$: Subject<SmartCubeRawMessage> = new Subject();
 
     private device: BluetoothDevice;
     private writeChrct: BluetoothRemoteGATTCharacteristic | null = null;
@@ -68,20 +69,44 @@ class MoyuMhcConnection implements SmartCubeConnection {
     }
 
     private onTurnEvent = (event: Event): void => {
-        const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const value = characteristic.value;
         if (!value) return;
+        const rawBytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        this.rawMessages$.next({
+            timestamp: now(),
+            characteristicUuid: characteristic.uuid,
+            raw: rawBytes.slice(),
+            decrypted: null
+        });
         this.parseTurn(value);
     };
 
     private onReadEvent = (event: Event): void => {
-        const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const value = characteristic.value;
         if (!value || !this.v1) return;
+        const rawBytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        this.rawMessages$.next({
+            timestamp: now(),
+            characteristicUuid: characteristic.uuid,
+            raw: rawBytes.slice(),
+            decrypted: null
+        });
         this.v1.onReadNotification(value);
     };
 
     private onGyroEvent = (event: Event): void => {
-        const e = (event.target as BluetoothRemoteGATTCharacteristic).value;
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const e = characteristic.value;
         if (!e || e.byteLength < 20) return;
+        const rawBytes = new Uint8Array(e.buffer, e.byteOffset, e.byteLength);
+        this.rawMessages$.next({
+            timestamp: now(),
+            characteristicUuid: characteristic.uuid,
+            raw: rawBytes.slice(),
+            decrypted: null
+        });
         const fw = e.getFloat32(4, true);
         const fx = e.getFloat32(8, true);
         const fy = e.getFloat32(12, true);
@@ -217,6 +242,9 @@ class MoyuMhcConnection implements SmartCubeConnection {
         }
         this.events$.next({ timestamp: now(), type: "DISCONNECT" });
         this.events$.complete();
+        if (!this.rawMessages$.closed) {
+            this.rawMessages$.complete();
+        }
     };
 
     private updateCapabilities(): void {

@@ -1,6 +1,6 @@
 
 import { Subject } from 'rxjs';
-import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider } from '../types';
+import { SmartCubeConnection, SmartCubeEvent, SmartCubeCommand, SmartCubeCapabilities, SmartCubeProtocolInfo, MacAddressProvider, SmartCubeRawMessage } from '../types';
 import type { AttachmentContext } from '../attachment/types';
 import { normalizeUuid } from '../attachment/normalize-uuid';
 import { SmartCubeProtocol, registerProtocol } from '../protocol';
@@ -113,6 +113,7 @@ class GiikerConnection implements SmartCubeConnection {
         reset: true
     };
     events$: Subject<SmartCubeEvent>;
+    readonly rawMessages$: Subject<SmartCubeRawMessage> = new Subject();
 
     private device: BluetoothDevice;
     private gatt: BluetoothRemoteGATTServer | null = null;
@@ -135,8 +136,30 @@ class GiikerConnection implements SmartCubeConnection {
     }
 
     private onStateChanged = (event: Event): void => {
-        const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+        const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+        const value = characteristic.value;
         if (!value) return;
+
+        // Emit raw message: decrypt inline to get the post-XOR bytes for inspection.
+        const rawBytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        const rawCopy = rawBytes.slice();
+        let decryptedBytes: Uint8Array | null = null;
+        if (rawCopy.length >= 20 && rawCopy[18] === 0xa7) {
+            const k1 = (rawCopy[19]! >> 4) & 0xf;
+            const k2 = rawCopy[19]! & 0xf;
+            const dec = rawCopy.slice();
+            for (let i = 0; i < 18; i++) {
+                dec[i] = (rawCopy[i]! + DECRYPT_KEY[i + k1]! + DECRYPT_KEY[i + k2]!) & 0xFF;
+            }
+            decryptedBytes = dec;
+        }
+        this.rawMessages$.next({
+            timestamp: now(),
+            characteristicUuid: characteristic.uuid,
+            raw: rawCopy,
+            decrypted: decryptedBytes
+        });
+
         if (!this.isReady) {
             // Copy the view, because the underlying buffer can be reused by the platform.
             const b = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
@@ -213,6 +236,9 @@ class GiikerConnection implements SmartCubeConnection {
         this.onBatteryChanged = null;
         this.events$.next({ timestamp: now(), type: "DISCONNECT" });
         this.events$.complete();
+        if (!this.rawMessages$.closed) {
+            this.rawMessages$.complete();
+        }
     };
 
     async init(): Promise<void> {

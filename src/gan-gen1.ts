@@ -3,6 +3,7 @@ import { decompressFromEncodedURIComponent } from 'lz-string';
 import { Subject } from 'rxjs';
 import * as def from './gan-cube-definitions';
 import type { GanCubeCommand, GanCubeConnection, GanCubeEvent } from './gan-cube-protocol';
+import type { SmartCubeRawMessage } from './smartcube/types';
 import { now } from './utils';
 
 type AesBlockCipher = AES & { decrypt(block: number[]): number[] };
@@ -91,6 +92,7 @@ export class GanGen1CubeConnection implements GanCubeConnection {
     readonly deviceMAC = '';
 
     readonly events$: Subject<GanCubeEvent>;
+    readonly rawMessages$: Subject<SmartCubeRawMessage> = new Subject();
 
     private readonly encrypter: GanGen1Aes;
     private readonly device: BluetoothDevice;
@@ -197,7 +199,14 @@ export class GanGen1CubeConnection implements GanCubeConnection {
             const chr = evt.target as BluetoothRemoteGATTCharacteristic;
             const e = chr.value;
             if (!e || e.byteLength < 16) return;
-            const dec = this.encrypter.decrypt(new Uint8Array(e.buffer, e.byteOffset, e.byteLength));
+            const raw = new Uint8Array(e.buffer, e.byteOffset, e.byteLength);
+            const dec = this.encrypter.decrypt(raw);
+            this.rawMessages$.next({
+                timestamp: now(),
+                characteristicUuid: chr.uuid,
+                raw: raw.slice(),
+                decrypted: dec
+            });
             const q = gyroFromState(dec);
             if (q) {
                 this.events$.next({ type: 'GYRO', timestamp: now(), quaternion: q });
@@ -343,6 +352,9 @@ export class GanGen1CubeConnection implements GanCubeConnection {
         }
         this.events$.next({ timestamp: now(), type: 'DISCONNECT' });
         this.events$.complete();
+        if (!this.rawMessages$.closed) {
+            this.rawMessages$.complete();
+        }
     }
 
     async sendCubeCommand(command: GanCubeCommand): Promise<void> {

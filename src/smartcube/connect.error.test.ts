@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { Subject } from 'rxjs';
 import { connectSmartCube } from './connect';
 import { registerProtocol, getRegisteredProtocols, type SmartCubeProtocol } from './protocol';
+import { EMPTY } from 'rxjs';
 import type { SmartCubeCapabilities, SmartCubeCommand, SmartCubeConnection, SmartCubeEvent } from './types';
 import { FIXTURES, loadFixture } from '../test/fixtures';
 import { installMockBluetoothFromFixture } from '../test/bluetooth-mock';
@@ -61,6 +62,7 @@ describe('connectSmartCube (error paths)', () => {
             protocol: { id: 'dummy', name: 'Dummy' },
             capabilities: caps,
             events$,
+            rawMessages$: EMPTY,
             sendCommand: async (_cmd: SmartCubeCommand) => {
               // Intentionally do not emit FACELETS (verification should time out).
             },
@@ -119,6 +121,7 @@ describe('connectSmartCube (error paths)', () => {
             protocol: { id: 'dummy', name: 'Dummy' },
             capabilities: { gyroscope: false, battery: false, facelets: true, hardware: false, reset: false },
             events$,
+            rawMessages$: EMPTY,
             sendCommand: async () => {},
             disconnect: async () => {
               events$.complete();
