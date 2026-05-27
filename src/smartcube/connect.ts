@@ -147,6 +147,12 @@ export async function connectSmartCube(
 
     const device = await navigator.bluetooth.requestDevice(requestOptions);
 
+    // First identity emit: device name is known the moment the user picks. Any
+    // failure from here on can be attributed to a specific advertised name.
+    if (device.name) {
+        opts.onDeviceInfo?.({ deviceName: device.name });
+    }
+
     opts.onStatus?.('Reading advertisements…');
     const advertisementManufacturerData = await waitForManufacturerData(
         device,
@@ -166,6 +172,10 @@ export async function connectSmartCube(
         }
         throw new Error("Selected device doesn't match any registered smartcube protocol");
     }
+
+    // (The library knows it's e.g. "GAN" at this point but the specific
+    // generation is resolved further inside protocol.connect(). The caller
+    // can still derive brand/model from device.name via its own heuristic.)
 
     const context = {
         serviceUuids,

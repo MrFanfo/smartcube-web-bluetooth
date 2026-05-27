@@ -27,6 +27,13 @@ export interface ConnectSmartCubeOptions {
     /** Called with short status messages during resolution (e.g. MAC search). */
     onStatus?: (message: string) => void;
     /**
+     * Fires immediately after the user picks a device, before any GATT
+     * activity. Lets callers tag analytics / debug logs with the cube identity
+     * even if the connect attempt subsequently throws (gatt_connect failure,
+     * service discovery failure, crypto handshake timeout, etc.).
+     */
+    onDeviceInfo?: (info: { deviceName: string }) => void;
+    /**
      * When true, if advertisement and name hints fail for QiYi / MoYu32, try a bounded set of MAC candidates
      * derived from the device name (slow; default false).
      */
