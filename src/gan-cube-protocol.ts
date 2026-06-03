@@ -52,6 +52,17 @@ type GanCubeMoveEvent = {
     type: "MOVE";
     /** Serial number, value range 0-255, increased in a circle on each facelets state change */
     serial: number;
+    /** Puzzle family. Omitted by legacy 3x3 drivers for backward compatibility. */
+    puzzle?: "3x3" | "2x2";
+    /** True when the event was recovered from move history rather than received live. */
+    recovered?: boolean;
+    /** 24-character 2x2 facelet snapshot after this move, when available. */
+    facelets24?: string;
+    /** 2x2 corners-only state after this move, when available. */
+    state2x2?: {
+        cornerPermutation: number[];
+        cornerOrientation: number[];
+    };
 } & GanCubeMove;
 
 /**
@@ -75,10 +86,19 @@ type GanCubeFaceletsEvent = {
     type: "FACELETS";
     /** Serial number, value range 0-255, increased in a circle on each facelets state change */
     serial: number;
+    /** Puzzle family. Omitted by legacy 3x3 drivers for backward compatibility. */
+    puzzle?: "3x3" | "2x2";
     /** Cube facelets state in the Kociemba notation like "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB" */
     facelets: string;
+    /** 24-character 2x2 facelet snapshot. Present for GAN251 UI. */
+    facelets24?: string;
     /** Cube state representing corners and edges orientation and permutation */
     state: GanCubeState;
+    /** 2x2 corners-only state. Present for GAN251 UI. */
+    state2x2?: {
+        cornerPermutation: number[];
+        cornerOrientation: number[];
+    };
 };
 
 /**
@@ -1203,4 +1223,3 @@ export {
     GanGen3ProtocolDriver,
     GanGen4ProtocolDriver
 };
-

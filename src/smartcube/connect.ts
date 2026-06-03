@@ -20,6 +20,16 @@ function isMacCacheProofEvent(e: SmartCubeEvent): boolean {
     if (e.type !== 'FACELETS') {
         return false;
     }
+    if (e.puzzle === '2x2') {
+        const facelets = e.facelets24 ?? e.facelets;
+        const corners = e.state2x2;
+        return (
+            facelets.length === 24 &&
+            Boolean(corners) &&
+            corners!.cornerPermutation.length === 8 &&
+            corners!.cornerOrientation.length === 8
+        );
+    }
     return new CubieCube().fromFacelet(e.facelets) !== -1;
 }
 

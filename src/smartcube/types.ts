@@ -3,16 +3,31 @@ import { Observable } from 'rxjs';
 
 type SmartCubeMoveEvent = {
     type: "MOVE";
+    puzzle?: "3x3" | "2x2";
     face: number;
     direction: number;
     move: string;
+    serial?: number;
+    recovered?: boolean;
     localTimestamp: number | null;
     cubeTimestamp: number | null;
+    facelets24?: string;
+    state2x2?: {
+        cornerPermutation: number[];
+        cornerOrientation: number[];
+    };
 };
 
 type SmartCubeFaceletsEvent = {
     type: "FACELETS";
+    puzzle?: "3x3" | "2x2";
     facelets: string;
+    facelets24?: string;
+    serial?: number;
+    state2x2?: {
+        cornerPermutation: number[];
+        cornerOrientation: number[];
+    };
 };
 
 type SmartCubeGyroEvent = {

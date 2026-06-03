@@ -22,6 +22,14 @@ import {
     GanGen3ProtocolDriver,
     GanGen4ProtocolDriver
 } from '../../gan-cube-protocol';
+import {
+    GAN251_CAPABILITIES,
+    GAN251_PROTOCOL,
+    Gan251CubeEncrypter,
+    Gan251ProtocolDriver,
+    isGan251DeviceName,
+    isValidGan251Packet,
+} from '../../gan251';
 
 const DEFAULT_GAN_CAPABILITIES: SmartCubeCapabilities = {
     gyroscope: true,
@@ -50,17 +58,26 @@ function ganEventToSmartEvent(event: GanCubeEvent): SmartCubeEvent {
             return {
                 timestamp: event.timestamp,
                 type: "MOVE",
+                puzzle: event.puzzle,
                 face: event.face,
                 direction: event.direction,
                 move: event.move,
+                serial: event.serial,
+                recovered: event.recovered,
                 localTimestamp: event.localTimestamp,
-                cubeTimestamp: event.cubeTimestamp
+                cubeTimestamp: event.cubeTimestamp,
+                facelets24: event.facelets24,
+                state2x2: event.state2x2,
             };
         case "FACELETS":
             return {
                 timestamp: event.timestamp,
                 type: "FACELETS",
-                facelets: event.facelets
+                puzzle: event.puzzle,
+                facelets: event.facelets,
+                facelets24: event.facelets24,
+                serial: event.serial,
+                state2x2: event.state2x2,
             };
         case "GYRO":
             return {
@@ -266,16 +283,19 @@ async function connectGanDevice(
         const service = await gatt.getPrimaryService(def.GAN_GEN4_SERVICE);
         const commandCharacteristic = await service.getCharacteristic(def.GAN_GEN4_COMMAND_CHARACTERISTIC);
         const stateCharacteristic = await service.getCharacteristic(def.GAN_GEN4_STATE_CHARACTERISTIC);
+        const isGan251 = isGan251DeviceName(device.name);
         const key = def.GAN_ENCRYPTION_KEYS[0];
-        const encrypter = new GanGen4CubeEncrypter(new Uint8Array(key.key), new Uint8Array(key.iv), salt);
-        const driver = new GanGen4ProtocolDriver();
+        const encrypter = isGan251
+            ? new Gan251CubeEncrypter(salt)
+            : new GanGen4CubeEncrypter(new Uint8Array(key.key), new Uint8Array(key.iv), salt);
+        const driver = isGan251 ? new Gan251ProtocolDriver() : new GanGen4ProtocolDriver();
         ganConn = await GanCubeClassicConnection.create(
             bleDevice,
             commandCharacteristic,
             stateCharacteristic,
             encrypter,
             driver,
-            { validateDecrypted: isValidGanGen4Packet },
+            { validateDecrypted: isGan251 ? isValidGan251Packet : isValidGanGen4Packet },
         );
     }
 
@@ -286,7 +306,11 @@ async function connectGanDevice(
     return new GanSmartCubeConnection(
         ganConn,
         mac,
-        pick === 'g2' ? GAN_GEN2_PROTOCOL : pick === 'g3' ? GAN_GEN3_PROTOCOL : GAN_GEN4_PROTOCOL,
+        pick === 'g2' ? GAN_GEN2_PROTOCOL
+            : pick === 'g3' ? GAN_GEN3_PROTOCOL
+                : isGan251DeviceName(device.name) ? GAN251_PROTOCOL
+                    : GAN_GEN4_PROTOCOL,
+        pick === 'g4' && isGan251DeviceName(device.name) ? GAN251_CAPABILITIES : undefined,
     );
 }
 
