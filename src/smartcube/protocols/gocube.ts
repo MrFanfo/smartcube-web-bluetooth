@@ -80,7 +80,7 @@ const FACE_OFFSET = [0, 0, 6, 2, 0, 0];
 /** Physical opposite faces in URFDLB axis order (U↔D, R↔L, F↔B). */
 const OPPOSITE_AXIS = [3, 4, 5, 0, 1, 2];
 
-const GOCUBE_PROTOCOL: SmartCubeProtocolInfo = { id: 'gocube', name: 'GoCube' };
+const GOCUBE_PROTOCOL: SmartCubeProtocolInfo = { id: 'gocube', name: 'GoCube', puzzleFamily: '3x3' };
 
 class GoCubeConnection implements SmartCubeConnection {
     readonly deviceName: string;
