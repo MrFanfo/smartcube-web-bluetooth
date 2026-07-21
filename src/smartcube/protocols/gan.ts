@@ -47,10 +47,31 @@ const GAN_GEN1_CAPABILITIES: SmartCubeCapabilities = {
     reset: false,
 };
 
-const GAN_GEN1_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen1', name: 'GAN Gen1' };
-const GAN_GEN2_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen2', name: 'GAN Gen2' };
-const GAN_GEN3_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen3', name: 'GAN Gen3' };
-const GAN_GEN4_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen4', name: 'GAN Gen4' };
+const GAN_GEN1_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen1',
+    name: 'GAN Gen1',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN1_PRIMARY_SERVICE,
+};
+const GAN_GEN2_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen2',
+    name: 'GAN Gen2',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN2_SERVICE,
+};
+const GAN_GEN3_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen3',
+    name: 'GAN Gen3',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN3_SERVICE,
+};
+const GAN_GEN4_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen4',
+    name: 'GAN Gen4',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN4_SERVICE,
+    gan251NameMatched: false,
+};
 
 function ganEventToSmartEvent(event: GanCubeEvent): SmartCubeEvent {
     switch (event.type) {
