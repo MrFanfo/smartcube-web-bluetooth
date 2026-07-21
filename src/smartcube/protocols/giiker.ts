@@ -99,7 +99,7 @@ function parseState(value: DataView): { facelet: string; prevMoves: string[] } {
     return { facelet, prevMoves };
 }
 
-const GIIKER_PROTOCOL: SmartCubeProtocolInfo = { id: 'giiker', name: 'Giiker' };
+const GIIKER_PROTOCOL: SmartCubeProtocolInfo = { id: 'giiker', name: 'Giiker', puzzleFamily: '3x3' };
 
 class GiikerConnection implements SmartCubeConnection {
     readonly deviceName: string;
