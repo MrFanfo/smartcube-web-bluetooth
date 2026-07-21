@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import * as def from '../../gan-cube-definitions';
 import { normalizeUuid } from '../attachment/normalize-uuid';
-import { ganProtocol } from './gan';
+import { ganProtocol, getGanGen4ProtocolSelection } from './gan';
+import { isGan251DeviceName } from '../../gan251';
 
 describe('ganProtocol.gattAffinity', () => {
   it('prefers gen1 profile when both gen1 services are present', () => {
@@ -28,3 +29,33 @@ describe('ganProtocol.gattAffinity', () => {
   });
 });
 
+
+
+describe('GAN Gen4 puzzle-family selection', () => {
+  it.each([
+    'GAN251UI_1234',
+    'gan251ui_abcd',
+    'GANic251_5678',
+  ])('recognizes genuine GAN251 name %s', (name) => {
+    expect(isGan251DeviceName(name)).toBe(true);
+    const selection = getGanGen4ProtocolSelection(name);
+    expect(selection.gan251NameMatched).toBe(true);
+    expect(selection.protocol.id).toBe('gan251-ui-v3-2');
+    expect(selection.protocol.puzzleFamily).toBe('2x2');
+  });
+
+  it.each([
+    'GANic4_1234',
+    'GAN iCarry 4',
+    'GANi4_A26E',
+    'GAN251',
+    'GANic251',
+    '',
+  ])('keeps non-GAN251 Gen4 name %s on the normal 3x3 driver', (name) => {
+    expect(isGan251DeviceName(name)).toBe(false);
+    const selection = getGanGen4ProtocolSelection(name);
+    expect(selection.gan251NameMatched).toBe(false);
+    expect(selection.protocol.id).toBe('gan-gen4');
+    expect(selection.protocol.puzzleFamily).toBe('3x3');
+  });
+});
