@@ -233,6 +233,11 @@ class GanCubeClassicConnection implements GanCubeConnection, GanCubeRawConnectio
     private readonly validateDecrypted?: (plaintext: Uint8Array) => boolean;
     private readonly writeQueue = new GattWriteQueue();
     private disconnectOnce = false;
+    private rawNotificationCount = 0;
+    private decryptedPacketCount = 0;
+    private validatedPacketCount = 0;
+    private droppedValidationCount = 0;
+    private emittedMoveCount = 0;
 
     private constructor(
         device: BluetoothDeviceWithMAC,
@@ -289,23 +294,98 @@ class GanCubeClassicConnection implements GanCubeConnection, GanCubeRawConnectio
     }
 
     onStateUpdate = async (evt: Event) => {
-        try {
-            var characteristic = evt.target as BluetoothRemoteGATTCharacteristic;
-            var eventMessage = characteristic.value;
-            if (!eventMessage || eventMessage.byteLength < 16) return;
-            var raw = new Uint8Array(eventMessage.buffer, eventMessage.byteOffset, eventMessage.byteLength);
-            var decryptedMessage = this.encrypter.decrypt(raw);
+        const characteristic = evt.target as BluetoothRemoteGATTCharacteristic;
+        const timestamp = now();
+        const eventMessage = characteristic.value;
+        this.rawNotificationCount++;
+
+        const emitDiagnostic = (
+            raw: Uint8Array,
+            decrypted: Uint8Array | null,
+            details: Partial<SmartCubeRawMessage>
+        ) => {
             this.rawMessages$.next({
-                timestamp: now(),
+                timestamp,
                 characteristicUuid: characteristic.uuid,
                 raw: raw.slice(),
-                decrypted: decryptedMessage
+                decrypted,
+                rawNotificationCount: this.rawNotificationCount,
+                decryptedPacketCount: this.decryptedPacketCount,
+                validatedPacketCount: this.validatedPacketCount,
+                droppedValidationCount: this.droppedValidationCount,
+                emittedMoveCount: this.emittedMoveCount,
+                ...details,
             });
-            if (this.validateDecrypted && !this.validateDecrypted(decryptedMessage)) return;
-            var cubeEvents = await this.driver.handleStateEvent(this, decryptedMessage);
-            cubeEvents.forEach(e => this.events$.next(e));
-        } catch {
-            /* ignore corrupt frame */
+        };
+
+        if (!eventMessage) {
+            this.droppedValidationCount++;
+            emitDiagnostic(new Uint8Array(), null, {
+                decryptionStatus: 'failed',
+                validationStatus: 'not-run',
+                dropReason: 'notification contained no characteristic value',
+                emittedEventCount: 0,
+            });
+            return;
+        }
+
+        const raw = new Uint8Array(eventMessage.buffer, eventMessage.byteOffset, eventMessage.byteLength);
+        if (raw.byteLength < 16) {
+            this.droppedValidationCount++;
+            emitDiagnostic(raw, null, {
+                decryptionStatus: 'failed',
+                validationStatus: 'not-run',
+                dropReason: `notification too short for GAN AES payload (${raw.byteLength} bytes)`,
+                emittedEventCount: 0,
+            });
+            return;
+        }
+
+        let decryptedMessage: Uint8Array;
+        try {
+            decryptedMessage = this.encrypter.decrypt(raw);
+            this.decryptedPacketCount++;
+        } catch (error) {
+            this.droppedValidationCount++;
+            emitDiagnostic(raw, null, {
+                decryptionStatus: 'failed',
+                validationStatus: 'not-run',
+                dropReason: error instanceof Error ? error.message : 'GAN packet decryption failed',
+                emittedEventCount: 0,
+            });
+            return;
+        }
+
+        if (this.validateDecrypted && !this.validateDecrypted(decryptedMessage)) {
+            this.droppedValidationCount++;
+            emitDiagnostic(raw, decryptedMessage, {
+                decryptionStatus: 'succeeded',
+                validationStatus: 'failed',
+                dropReason: 'decrypted GAN packet failed structural validation',
+                emittedEventCount: 0,
+            });
+            return;
+        }
+
+        this.validatedPacketCount++;
+        try {
+            const cubeEvents = await this.driver.handleStateEvent(this, decryptedMessage);
+            const emittedMoves = cubeEvents.filter((event) => event.type === 'MOVE').length;
+            this.emittedMoveCount += emittedMoves;
+            emitDiagnostic(raw, decryptedMessage, {
+                decryptionStatus: 'succeeded',
+                validationStatus: 'passed',
+                emittedEventCount: cubeEvents.length,
+                emittedMoveCount: this.emittedMoveCount,
+            });
+            cubeEvents.forEach((event) => this.events$.next(event));
+        } catch (error) {
+            emitDiagnostic(raw, decryptedMessage, {
+                decryptionStatus: 'succeeded',
+                validationStatus: 'passed',
+                dropReason: error instanceof Error ? error.message : 'GAN protocol driver failed',
+                emittedEventCount: 0,
+            });
         }
     }
 
