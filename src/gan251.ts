@@ -19,6 +19,9 @@ const GAN251_BASE_IV = new Uint8Array([
 export const GAN251_PROTOCOL: SmartCubeProtocolInfo = {
     id: 'gan251-ui-v3-2',
     name: 'GAN251 UI V3-2',
+    puzzleFamily: '2x2',
+    serviceUuid: '00000010-0000-fff7-fff6-fff5fff4fff0',
+    gan251NameMatched: true,
 };
 
 export const GAN251_CAPABILITIES: SmartCubeCapabilities = {
