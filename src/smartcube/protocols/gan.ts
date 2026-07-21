@@ -137,6 +137,15 @@ function hasGanGen1Profile(serviceUuids: ReadonlySet<string>): boolean {
     return serviceUuids.has(primary) && serviceUuids.has(deviceInfo);
 }
 
+export function getGanGen4ProtocolSelection(deviceName: string | null | undefined) {
+    const gan251NameMatched = isGan251DeviceName(deviceName);
+    return {
+        gan251NameMatched,
+        protocol: gan251NameMatched ? GAN251_PROTOCOL : GAN_GEN4_PROTOCOL,
+        capabilities: gan251NameMatched ? GAN251_CAPABILITIES : undefined,
+    };
+}
+
 class GanSmartCubeConnection implements SmartCubeConnection {
     private ganConn: GanCubeConnection;
     private deviceMac: string;
@@ -269,6 +278,7 @@ async function connectGanDevice(
     else if (serviceUuidSet.has(g4)) pick = 'g4';
 
     let ganConn: GanCubeConnection | null = null;
+    let gen4Selection: ReturnType<typeof getGanGen4ProtocolSelection> | null = null;
 
     if (pick === 'g2') {
         const service = await gatt.getPrimaryService(def.GAN_GEN2_SERVICE);
@@ -304,7 +314,8 @@ async function connectGanDevice(
         const service = await gatt.getPrimaryService(def.GAN_GEN4_SERVICE);
         const commandCharacteristic = await service.getCharacteristic(def.GAN_GEN4_COMMAND_CHARACTERISTIC);
         const stateCharacteristic = await service.getCharacteristic(def.GAN_GEN4_STATE_CHARACTERISTIC);
-        const isGan251 = isGan251DeviceName(device.name);
+        gen4Selection = getGanGen4ProtocolSelection(device.name);
+        const isGan251 = gen4Selection.gan251NameMatched;
         const key = def.GAN_ENCRYPTION_KEYS[0];
         const encrypter = isGan251
             ? new Gan251CubeEncrypter(salt)
@@ -329,9 +340,8 @@ async function connectGanDevice(
         mac,
         pick === 'g2' ? GAN_GEN2_PROTOCOL
             : pick === 'g3' ? GAN_GEN3_PROTOCOL
-                : isGan251DeviceName(device.name) ? GAN251_PROTOCOL
-                    : GAN_GEN4_PROTOCOL,
-        pick === 'g4' && isGan251DeviceName(device.name) ? GAN251_CAPABILITIES : undefined,
+                : gen4Selection!.protocol,
+        gen4Selection?.capabilities,
     );
 }
 
