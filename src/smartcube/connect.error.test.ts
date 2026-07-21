@@ -59,7 +59,7 @@ describe('connectSmartCube (error paths)', () => {
           const conn: SmartCubeConnection = {
             deviceName: 'Dummy',
             deviceMAC: 'AA:BB:CC:DD:EE:FF',
-            protocol: { id: 'dummy', name: 'Dummy' },
+            protocol: { id: 'dummy', name: 'Dummy', puzzleFamily: '3x3' },
             capabilities: caps,
             events$,
             rawMessages$: EMPTY,
@@ -118,7 +118,7 @@ describe('connectSmartCube (error paths)', () => {
           return {
             deviceName: 'Dummy',
             deviceMAC: 'AA:BB:CC:DD:EE:FF',
-            protocol: { id: 'dummy', name: 'Dummy' },
+            protocol: { id: 'dummy', name: 'Dummy', puzzleFamily: '3x3' },
             capabilities: { gyroscope: false, battery: false, facelets: true, hardware: false, reset: false },
             events$,
             rawMessages$: EMPTY,
