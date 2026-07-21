@@ -115,9 +115,9 @@ describe('ganProtocol.connect (capture replay)', () => {
     rawSubscription.unsubscribe();
     expect(rawMessages.length).toBeGreaterThan(0);
     expect(rawMessages.some((message) => message.validationStatus === 'passed')).toBe(true);
-    expect(rawMessages.at(-1)?.rawNotificationCount).toBeGreaterThan(0);
-    expect(rawMessages.at(-1)?.validatedPacketCount).toBeGreaterThan(0);
-    expect(rawMessages.at(-1)?.emittedMoveCount).toBeGreaterThan(0);
+    expect(rawMessages[rawMessages.length - 1]?.rawNotificationCount).toBeGreaterThan(0);
+    expect(rawMessages[rawMessages.length - 1]?.validatedPacketCount).toBeGreaterThan(0);
+    expect(rawMessages[rawMessages.length - 1]?.emittedMoveCount).toBeGreaterThan(0);
     // This test intentionally avoids strict MOVE ordering assertions, because GAN gen4 fixtures
     // may include notify traffic that is consumed during init before external subscribers attach.
     // Driver-level correctness is covered by the unit decode test above.
