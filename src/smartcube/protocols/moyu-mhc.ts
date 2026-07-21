@@ -32,7 +32,7 @@ function normalizeQuaternion(q: { w: number; x: number; y: number; z: number }):
     return { w: q.w / n, x: q.x / n, y: q.y / n, z: q.z / n };
 }
 
-const MOYU_MHC_PROTOCOL: SmartCubeProtocolInfo = { id: 'moyu-mhc', name: 'MoYu MHC' };
+const MOYU_MHC_PROTOCOL: SmartCubeProtocolInfo = { id: 'moyu-mhc', name: 'MoYu MHC', puzzleFamily: '3x3' };
 
 class MoyuMhcConnection implements SmartCubeConnection {
     readonly deviceName: string;
