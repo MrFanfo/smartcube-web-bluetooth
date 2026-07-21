@@ -9,6 +9,7 @@ import './protocols/qiyi';
 
 // Re-export types and connect function
 export type {
+    PuzzleFamily,
     SmartCubeEvent,
     SmartCubeEventMessage,
     SmartCubeMoveEvent,

@@ -1,9 +1,11 @@
 
 import { Observable } from 'rxjs';
 
+type PuzzleFamily = "3x3" | "2x2";
+
 type SmartCubeMoveEvent = {
     type: "MOVE";
-    puzzle?: "3x3" | "2x2";
+    puzzle?: PuzzleFamily;
     face: number;
     direction: number;
     move: string;
@@ -20,7 +22,7 @@ type SmartCubeMoveEvent = {
 
 type SmartCubeFaceletsEvent = {
     type: "FACELETS";
-    puzzle?: "3x3" | "2x2";
+    puzzle?: PuzzleFamily;
     facelets: string;
     facelets24?: string;
     serial?: number;
@@ -44,6 +46,9 @@ type SmartCubeBatteryEvent = {
 type SmartCubeProtocolInfo = {
     id: string;
     name: string;
+    puzzleFamily: PuzzleFamily;
+    serviceUuid?: string;
+    gan251NameMatched?: boolean;
 };
 
 type SmartCubeHardwareEvent = {
@@ -66,8 +71,17 @@ type SmartCubeRawMessage = {
     characteristicUuid: string;
     /** Bytes exactly as received from the BLE layer (encrypted if the protocol uses encryption). */
     raw: Uint8Array;
-    /** Bytes after decryption. null when the protocol transmits plaintext. */
+    /** Bytes after decryption. null when decryption failed or the protocol transmits plaintext. */
     decrypted: Uint8Array | null;
+    decryptionStatus?: "not-required" | "succeeded" | "failed";
+    validationStatus?: "not-run" | "passed" | "failed";
+    dropReason?: string;
+    emittedEventCount?: number;
+    emittedMoveCount?: number;
+    rawNotificationCount?: number;
+    decryptedPacketCount?: number;
+    validatedPacketCount?: number;
+    droppedValidationCount?: number;
 };
 
 type SmartCubeEventMessage =
@@ -109,6 +123,7 @@ interface SmartCubeConnection {
 type MacAddressProvider = (device: BluetoothDevice, isFallbackCall?: boolean) => Promise<string | null>;
 
 export type {
+    PuzzleFamily,
     SmartCubeEvent,
     SmartCubeEventMessage,
     SmartCubeMoveEvent,

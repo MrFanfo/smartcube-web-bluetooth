@@ -133,7 +133,7 @@ function parseFacelet(faceletBits: string): string {
     return state.join('');
 }
 
-const MOYU32_PROTOCOL: SmartCubeProtocolInfo = { id: 'moyu32', name: 'MoYu32' };
+const MOYU32_PROTOCOL: SmartCubeProtocolInfo = { id: 'moyu32', name: 'MoYu32', puzzleFamily: '3x3' };
 
 class Moyu32Connection implements SmartCubeConnection {
     readonly deviceName: string;

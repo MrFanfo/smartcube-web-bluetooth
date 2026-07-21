@@ -105,7 +105,7 @@ function collectQiYiStateChangeMoves(msg: number[], headerTs: number): [number, 
     });
 }
 
-const QIYI_PROTOCOL: SmartCubeProtocolInfo = { id: 'qiyi', name: 'QiYi' };
+const QIYI_PROTOCOL: SmartCubeProtocolInfo = { id: 'qiyi', name: 'QiYi', puzzleFamily: '3x3' };
 
 class QiYiConnection implements SmartCubeConnection {
     readonly deviceName: string;

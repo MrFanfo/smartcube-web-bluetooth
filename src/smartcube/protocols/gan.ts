@@ -47,10 +47,31 @@ const GAN_GEN1_CAPABILITIES: SmartCubeCapabilities = {
     reset: false,
 };
 
-const GAN_GEN1_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen1', name: 'GAN Gen1' };
-const GAN_GEN2_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen2', name: 'GAN Gen2' };
-const GAN_GEN3_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen3', name: 'GAN Gen3' };
-const GAN_GEN4_PROTOCOL: SmartCubeProtocolInfo = { id: 'gan-gen4', name: 'GAN Gen4' };
+const GAN_GEN1_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen1',
+    name: 'GAN Gen1',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN1_PRIMARY_SERVICE,
+};
+const GAN_GEN2_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen2',
+    name: 'GAN Gen2',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN2_SERVICE,
+};
+const GAN_GEN3_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen3',
+    name: 'GAN Gen3',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN3_SERVICE,
+};
+const GAN_GEN4_PROTOCOL: SmartCubeProtocolInfo = {
+    id: 'gan-gen4',
+    name: 'GAN Gen4',
+    puzzleFamily: '3x3',
+    serviceUuid: def.GAN_GEN4_SERVICE,
+    gan251NameMatched: false,
+};
 
 function ganEventToSmartEvent(event: GanCubeEvent): SmartCubeEvent {
     switch (event.type) {
@@ -114,6 +135,15 @@ function hasGanGen1Profile(serviceUuids: ReadonlySet<string>): boolean {
     const primary = normalizeUuid(def.GAN_GEN1_PRIMARY_SERVICE);
     const deviceInfo = normalizeUuid(def.GAN_GEN1_DEVICE_INFO_SERVICE);
     return serviceUuids.has(primary) && serviceUuids.has(deviceInfo);
+}
+
+export function getGanGen4ProtocolSelection(deviceName: string | null | undefined) {
+    const gan251NameMatched = isGan251DeviceName(deviceName);
+    return {
+        gan251NameMatched,
+        protocol: gan251NameMatched ? GAN251_PROTOCOL : GAN_GEN4_PROTOCOL,
+        capabilities: gan251NameMatched ? GAN251_CAPABILITIES : undefined,
+    };
 }
 
 class GanSmartCubeConnection implements SmartCubeConnection {
@@ -248,6 +278,7 @@ async function connectGanDevice(
     else if (serviceUuidSet.has(g4)) pick = 'g4';
 
     let ganConn: GanCubeConnection | null = null;
+    let gen4Selection: ReturnType<typeof getGanGen4ProtocolSelection> | null = null;
 
     if (pick === 'g2') {
         const service = await gatt.getPrimaryService(def.GAN_GEN2_SERVICE);
@@ -283,7 +314,8 @@ async function connectGanDevice(
         const service = await gatt.getPrimaryService(def.GAN_GEN4_SERVICE);
         const commandCharacteristic = await service.getCharacteristic(def.GAN_GEN4_COMMAND_CHARACTERISTIC);
         const stateCharacteristic = await service.getCharacteristic(def.GAN_GEN4_STATE_CHARACTERISTIC);
-        const isGan251 = isGan251DeviceName(device.name);
+        gen4Selection = getGanGen4ProtocolSelection(device.name);
+        const isGan251 = gen4Selection.gan251NameMatched;
         const key = def.GAN_ENCRYPTION_KEYS[0];
         const encrypter = isGan251
             ? new Gan251CubeEncrypter(salt)
@@ -308,9 +340,8 @@ async function connectGanDevice(
         mac,
         pick === 'g2' ? GAN_GEN2_PROTOCOL
             : pick === 'g3' ? GAN_GEN3_PROTOCOL
-                : isGan251DeviceName(device.name) ? GAN251_PROTOCOL
-                    : GAN_GEN4_PROTOCOL,
-        pick === 'g4' && isGan251DeviceName(device.name) ? GAN251_CAPABILITIES : undefined,
+                : gen4Selection!.protocol,
+        gen4Selection?.capabilities,
     );
 }
 
