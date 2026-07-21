@@ -103,11 +103,21 @@ describe('ganProtocol.connect (capture replay)', () => {
     );
 
     expect(conn.protocol.id).toBe('gan-gen4');
+    expect(conn.protocol.puzzleFamily).toBe('3x3');
+    expect(conn.protocol.gan251NameMatched).toBe(false);
+    const rawMessages: Array<import('../types').SmartCubeRawMessage> = [];
+    const rawSubscription = conn.rawMessages$.subscribe((message) => rawMessages.push(message));
     const { events, unsubscribe } = collectEvents(conn);
     const cur = replayer.debugCursor();
     expect(cur.index).toBeLessThan(cur.length);
     await replayer.drainNotificationsAsync();
     unsubscribe();
+    rawSubscription.unsubscribe();
+    expect(rawMessages.length).toBeGreaterThan(0);
+    expect(rawMessages.some((message) => message.validationStatus === 'passed')).toBe(true);
+    expect(rawMessages.at(-1)?.rawNotificationCount).toBeGreaterThan(0);
+    expect(rawMessages.at(-1)?.validatedPacketCount).toBeGreaterThan(0);
+    expect(rawMessages.at(-1)?.emittedMoveCount).toBeGreaterThan(0);
     // This test intentionally avoids strict MOVE ordering assertions, because GAN gen4 fixtures
     // may include notify traffic that is consumed during init before external subscribers attach.
     // Driver-level correctness is covered by the unit decode test above.
@@ -123,5 +133,34 @@ describe('ganProtocol.connect (capture replay)', () => {
 
     await conn.disconnect();
   }, 20_000);
-});
+  it('surfaces packet-validation drops instead of looking like a dead cube', async () => {
+    const fixture = await loadFixture(FIXTURES.ganGen4);
+    const { device, replayer } = installMockBluetoothFromFixture(fixture, {
+      deviceId: 'gan-gen4-wrong-mac',
+      maxAutoFlushNotifies: 0,
+    });
 
+    const conn = await ganProtocol.connect(
+      device,
+      async () => '00:11:22:33:44:55',
+      {
+        serviceUuids: serviceUuidsFromFixture(fixture),
+        advertisementManufacturerData: null,
+        enableAddressSearch: false,
+        onStatus: undefined,
+        signal: undefined,
+      }
+    );
+
+    const rawMessages: Array<import('../types').SmartCubeRawMessage> = [];
+    const subscription = conn.rawMessages$.subscribe((message) => rawMessages.push(message));
+    await replayer.drainNotificationsAsync();
+    subscription.unsubscribe();
+
+    expect(rawMessages.some((message) => message.validationStatus === 'failed')).toBe(true);
+    expect(rawMessages.some((message) => message.dropReason?.includes('structural validation'))).toBe(true);
+    expect(Math.max(...rawMessages.map((message) => message.droppedValidationCount ?? 0))).toBeGreaterThan(0);
+
+    await conn.disconnect();
+  }, 20_000);
+});
