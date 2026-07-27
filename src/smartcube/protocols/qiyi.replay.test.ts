@@ -34,5 +34,51 @@ describe('qiyiProtocol.connect (capture replay)', () => {
 
     await conn.disconnect();
   }, 20_000);
-});
 
+  it('resynchronizes from packet facelets when move history cannot cover a notification gap', async () => {
+    const fixture = await loadFixture(FIXTURES.qiyi);
+    const stateNotifications = fixture.traffic.filter(
+      (entry) => entry.op === 'notify' && entry.data?.length === 192,
+    );
+    const target = stateNotifications[12]!;
+    const expectedFacelets = fixture.events.find(
+      (entry) => entry.t >= target.t && entry.event.type === 'FACELETS',
+    )?.event.facelets as string | undefined;
+    expect(expectedFacelets).toBeDefined();
+
+    const gapFixture = {
+      ...fixture,
+      traffic: fixture.traffic.filter((entry) => {
+        if (entry.t > target.t) return false;
+        const isStateNotification = entry.op === 'notify' && entry.data?.length === 192;
+        return !isStateNotification || entry === target;
+      }),
+    };
+    const { device, replayer } = installMockBluetoothFromFixture(gapFixture, {
+      deviceId: 'qiyi-gap-replay',
+    });
+
+    const conn = await qiyiProtocol.connect(
+      device,
+      async () => fixture.device.mac ?? null,
+      {
+        serviceUuids: serviceUuidsFromFixture(fixture),
+        advertisementManufacturerData: null,
+        enableAddressSearch: false,
+        onStatus: undefined,
+        signal: undefined,
+      }
+    );
+    const { events, unsubscribe } = collectEvents(conn);
+
+    await replayer.drainNotificationsAsync();
+    unsubscribe();
+
+    // csTimer recovers the current move plus nine history entries. The
+    // authoritative facelets must repair the older moves outside that window.
+    expect(moves(events)).toHaveLength(10);
+    expect(lastFacelets(events)).toBe(expectedFacelets);
+
+    await conn.disconnect();
+  }, 20_000);
+});
