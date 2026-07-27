@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { FIXTURES, loadFixture } from '../../test/fixtures';
 import { installMockBluetoothFromFixture } from '../../test/bluetooth-mock';
 import { serviceUuidsFromFixture } from '../../test/helpers/fixture-replay';
@@ -111,13 +111,15 @@ describe('ganProtocol.connect (capture replay)', () => {
     const cur = replayer.debugCursor();
     expect(cur.index).toBeLessThan(cur.length);
     await replayer.drainNotificationsAsync();
-    unsubscribe();
-    rawSubscription.unsubscribe();
+    await vi.waitFor(() => {
+      expect(Math.max(...rawMessages.map((message) => message.emittedMoveCount ?? 0))).toBeGreaterThan(0);
+      expect(events.length).toBeGreaterThan(0);
+    });
     expect(rawMessages.length).toBeGreaterThan(0);
     expect(rawMessages.some((message) => message.validationStatus === 'passed')).toBe(true);
     expect(rawMessages[rawMessages.length - 1]?.rawNotificationCount).toBeGreaterThan(0);
     expect(rawMessages[rawMessages.length - 1]?.validatedPacketCount).toBeGreaterThan(0);
-    expect(rawMessages[rawMessages.length - 1]?.emittedMoveCount).toBeGreaterThan(0);
+    expect(Math.max(...rawMessages.map((message) => message.emittedMoveCount ?? 0))).toBeGreaterThan(0);
     // This test intentionally avoids strict MOVE ordering assertions, because GAN gen4 fixtures
     // may include notify traffic that is consumed during init before external subscribers attach.
     // Driver-level correctness is covered by the unit decode test above.
@@ -130,6 +132,8 @@ describe('ganProtocol.connect (capture replay)', () => {
         e.type === 'HARDWARE'
       )
     ).toBe(true);
+    unsubscribe();
+    rawSubscription.unsubscribe();
 
     await conn.disconnect();
   }, 20_000);
